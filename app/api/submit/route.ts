@@ -8,12 +8,14 @@ export async function POST(request: NextRequest) {
   const songTrimmed = song.trim();
   console.log("📌 요청으로 받은 데이터:", body);
 
-  // ✅ 현재 시간 (한국 기준)
+  // ✅ 현재 시간 (KST 기준)
   const currentDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
 
-  // ✅ 제출 시간 문자열 (완전한 텍스트, 날짜 + 시간)
-  const submitTime = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')} ` +
-                     `${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
+  // ✅ 제출 시간 문자열 (날짜 + 시간 텍스트로 명시)
+  const submitTime = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1)
+    .toString()
+    .padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')} ` +
+    `${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
 
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -34,10 +36,9 @@ export async function POST(request: NextRequest) {
   const range = `${songTrimmed}!A:F`;
 
   try {
-    // ✅ 합주 시작 시간 계산
-    const [hourStr, minuteStr] = timeSlot.split(':');
-    const startTimeString = `${date}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00`;
-    const startTime = new Date(new Date(startTimeString).toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    // ✅ 합주 시작 시간 (KST 기준) - 문자열로 명확하게 처리
+    const startTimeParts = `${date} ${timeSlot}`; // 예: "2025-04-10 13:30"
+    const startTime = new Date(new Date(startTimeParts).toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
 
     const timeDiffMin = (currentDate.getTime() - startTime.getTime()) / (1000 * 60);
 
@@ -57,8 +58,8 @@ export async function POST(request: NextRequest) {
       finalStatus = '결석';
       backgroundColor = { red: 1, green: 0.8, blue: 0.8 }; // 빨강
     }
-    
-    // ✅ 바로 여기 아래에 붙여넣기!
+
+    // ✅ 디버깅 로그
     console.log("🕒 현재 시간:", currentDate.toString());
     console.log("🎯 합주 시작 시간:", startTime.toString());
     console.log("⏱️ 시간 차이 (분):", timeDiffMin);
