@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         } else if (timeDiffMin <= 15) {
             finalStatus = '출석';
             backgroundColor = { red: 0.8, green: 1, blue: 0.8 }; // 초록
-        } else if (timeDiffMin <= 60) {
+        } else if (timeDiffMin > 15 && timeDiffMin <= 60) {
             finalStatus = '지각';
             backgroundColor = { red: 1, green: 1, blue: 0.6 }; // 노랑
         } else {
