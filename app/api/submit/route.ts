@@ -57,6 +57,12 @@ export async function POST(request: NextRequest) {
       finalStatus = '결석';
       backgroundColor = { red: 1, green: 0.8, blue: 0.8 }; // 빨강
     }
+    
+    // ✅ 바로 여기 아래에 붙여넣기!
+    console.log("🕒 현재 시간:", currentDate.toString());
+    console.log("🎯 합주 시작 시간:", startTime.toString());
+    console.log("⏱️ 시간 차이 (분):", timeDiffMin);
+    console.log("📌 최종 출결 상태:", finalStatus);
 
     // ✅ 기존 데이터 불러오기
     const getResponse = await sheets.spreadsheets.values.get({
