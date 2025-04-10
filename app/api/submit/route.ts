@@ -10,11 +10,16 @@ export async function POST(request: NextRequest) {
 
     const currentDate = new Date();
     const formatter = new Intl.DateTimeFormat('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
         timeZone: 'Asia/Seoul'
       });
+      
+      // 한국 시간 기준으로 '2025-04-10 오전 2:17' 같은 포맷
       const submitTime = formatter.format(new Date());
 
     const auth = new google.auth.GoogleAuth({
