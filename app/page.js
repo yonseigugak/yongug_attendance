@@ -23,13 +23,19 @@ const AttendanceForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // 🎯 합주 시작 시간만 추출 (예: "19:00")
+    const timeSlot = formData.rehearsalTime.split('-')[0];
+
     try {
       const response = await fetch('/api/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          timeSlot, // ✅ timeSlot 추가
+        }),
       });
 
       const result = await response.json();
