@@ -9,11 +9,13 @@ export async function POST(request: NextRequest) {
     console.log("📌 요청으로 받은 데이터:", body);
 
     const currentDate = new Date();
-    const submitTime = currentDate.toLocaleTimeString('ko-KR', {
+    const formatter = new Intl.DateTimeFormat('ko-KR', {
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'Asia/Seoul',
-    });
+        hour12: true,
+        timeZone: 'Asia/Seoul'
+      });
+      const submitTime = formatter.format(new Date());
 
     const auth = new google.auth.GoogleAuth({
         credentials: {
