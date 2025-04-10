@@ -9,6 +9,7 @@ const AttendanceForm = () => {
     date: '',
     status: '출석',
     reason: '',
+    rehearsalTime: '19:00-20:20'
   });
 
   const handleChange = (e) => {
@@ -56,6 +57,19 @@ const AttendanceForm = () => {
             <option value="미락흘">미락흘</option>
             <option value="도드리">도드리</option>
             <option value="플투스">플투스</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block mb-1">합주 시간대</label>
+          <select name="rehearsalTime" value={formData.rehearsalTime} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full">
+            <option value="19:00-20:20">19:00-20:20</option>
+            <option value="20:30-21:50">20:30-21:50</option>
+            <option value="10:00-11:00">10:00-11:00</option>
+            <option value="11:15-12:15">11:15-12:15</option>
+            <option value="13:30-14:30">13:30-14:30</option>
+            <option value="14:45-15:45">14:45-15:45</option>
+            <option value="16:00-17:00">16:00-17:00</option>
           </select>
         </div>
 

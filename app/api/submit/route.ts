@@ -2,9 +2,11 @@ import { google } from 'googleapis';
 import type { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
+
     const body = await request.json();
     const { song, name, date, status, reason } = body;
 
+    const songTrimmed = song.trim()
     console.log("📌 요청으로 받은 데이터:", body);
 
     const currentDate = new Date();
@@ -24,11 +26,11 @@ export async function POST(request: NextRequest) {
 
     const validSheets = ['취타', '축제', '미락흘', '도드리', '플투스'];
 
-    if (!validSheets.includes(song)) {
+    if (!validSheets.includes(songTrimmed)) {
         return new Response(JSON.stringify({ error: '유효하지 않은 곡명입니다.' }), { status: 400 });
     }
 
-    const range = `${song}!A:F`;
+    const range = `${songTrimmed}!A:F`;
 
     try {
         console.log("📌 Google Sheets API에 보내는 데이터:", [song, name, date, status, reason, submitTime]);
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
         // 🔄 데이터 덮어쓰기 방식으로 추가하기 (append 대신 update 사용)
         const appendResponse = await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: `${song}!A${nextRow}:F${nextRow}`,
+            range: `${songTrimmed}!A${nextRow}:F${nextRow}`,
             valueInputOption: 'USER_ENTERED',
             requestBody: {
                 values: [
@@ -61,17 +63,42 @@ export async function POST(request: NextRequest) {
         const lastRow = nextRow;
 
         // ✅ 셀 배경색 설정하기
-        const backgroundColor = status === '출석' ? { red: 0.8, green: 1, blue: 0.8 } : { red: 0.8, green: 0.93, blue: 1 };
-
+        const backgroundColor = status === '출석'
+        ? { red: 0.8, green: 1, blue: 0.8 }
+        : { red: 0.8, green: 0.93, blue: 1 };
+    
         const sheetInfo = await sheets.spreadsheets.get({
             spreadsheetId,
+            includeGridData: false, // 기본값이지만 명시해주는 것도 안정적
+            fields: 'sheets.properties', // 💡 시트 ID를 포함한 모든 properties 반환 요청
         });
+    
+    // 🔤 유니코드 정규화 + 공백 제거
+    const normalizeKorean = (str: string) => str.normalize("NFC").trim();
+    
+    // 📋 시트 제목 목록 출력
+    const sheetTitles = sheetInfo.data.sheets?.map(sheet => sheet.properties?.title);
+    console.log("📌 현재 스프레드시트 시트 목록:", sheetTitles);
 
-        const targetSheet = sheetInfo.data.sheets?.find(sheet => sheet.properties?.title === song);
-
-        if (!targetSheet?.properties?.sheetId) {
-            throw new Error("해당 시트를 찾을 수 없습니다.");
-        }
+    
+    
+    // 🧪 디버깅용 로그
+    console.log("🎯 song.trim() =", JSON.stringify(normalizeKorean(song)));
+    sheetInfo.data.sheets?.forEach(sheet => {
+        const rawTitle = sheet.properties?.title || "";
+        console.log("📄 sheet title =", JSON.stringify(normalizeKorean(rawTitle)));
+        console.log("🔍 equals:", normalizeKorean(rawTitle) === normalizeKorean(song));
+    });
+    
+    // ✅ 시트 찾기 (정규화 + 트림 기준)
+    const targetSheet = sheetInfo.data.sheets?.find(sheet => {
+        const rawTitle = sheet.properties?.title || "";
+        return normalizeKorean(rawTitle) === normalizeKorean(song);
+    });
+    
+    if (!targetSheet?.properties?.sheetId === undefined) {
+        throw new Error("해당 시트를 찾을 수 없습니다.");
+    }
 
         await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
