@@ -8,9 +8,9 @@ export async function POST(request: NextRequest) {
   const songTrimmed = song.trim();
   console.log("📌 요청으로 받은 데이터:", body);
 
-  // ✅ 현재 시간 (UTC → KST 변환)
+  // ✅ 현재 시간 (KST = UTC + 9시간)
   const now = new Date();
-  const currentDate = new Date(now.getTime() + 9 * 60 * 60 * 1000); // KST = UTC + 9시간
+  const currentDate = new Date(now.getTime() + 9 * 60 * 60 * 1000); // KST 기준 현재 시간
 
   // ✅ 제출 시간 문자열
   const submitTime = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1)
@@ -37,13 +37,14 @@ export async function POST(request: NextRequest) {
   const range = `${songTrimmed}!A:F`;
 
   try {
-    // ✅ 합주 시작 시간 (UTC + 9)
+    // ✅ 합주 시작 시간 (KST = UTC + 9시간)
     const [hourStr, minuteStr] = timeSlot.split(':');
-    const startTime = new Date(`${date}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00+09:00`);
+    const startTimeUTC = new Date(`${date}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00Z`);
+    const startTime = new Date(startTimeUTC.getTime() + 9 * 60 * 60 * 1000);
 
     const timeDiffMin = (currentDate.getTime() - startTime.getTime()) / (1000 * 60);
 
-    // ✅ 출결 상태와 색상 결정
+    // ✅ 출결 상태 및 배경색 결정
     let finalStatus = status;
     let backgroundColor;
 
@@ -67,15 +68,11 @@ export async function POST(request: NextRequest) {
     console.log("📌 최종 출결 상태:", finalStatus);
 
     // ✅ 기존 데이터 불러오기
-    const getResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range,
-    });
-
+    const getResponse = await sheets.spreadsheets.values.get({ spreadsheetId, range });
     const rows = getResponse.data.values || [];
     const nextRow = rows.length + 1;
 
-    // ✅ 데이터 기록
+    // ✅ 데이터 저장
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${songTrimmed}!A${nextRow}:F${nextRow}`,
@@ -103,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     const sheetId = targetSheet.properties.sheetId;
 
-    // ✅ 셀 색상 설정
+    // ✅ 셀 배경색 설정
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {
