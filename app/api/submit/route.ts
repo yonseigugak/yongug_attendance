@@ -36,27 +36,38 @@ export async function POST(request: NextRequest) {
     try {
         // ✅ 출결 상태 자동 판별 로직
         const [hourStr, minuteStr] = timeSlot.split(':');
-        const startTime = new Date(date);
-        startTime.setHours(Number(hourStr));
-        startTime.setMinutes(Number(minuteStr));
-        startTime.setSeconds(0);
-
+      
+        // 현재 시간 (KST 기준)
+        const currentDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+      
+        // 합주 시작 시간 (KST 기준)
+        const startTimeString = `${date}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00`;
+        const startTime = new Date(new Date(startTimeString).toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+      
+        // 시간 차이 계산
         const timeDiffMin = (currentDate.getTime() - startTime.getTime()) / (1000 * 60);
-
+      
+        // 제출 시간 문자열
+        const submitTime = currentDate.toLocaleTimeString('ko-KR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Seoul'
+        });
+      
         let finalStatus = status;
         let backgroundColor;
-
+      
         if (reason === '고정결석계' || reason === '일반결석계') {
-            backgroundColor = { red: 0.8, green: 0.93, blue: 1 }; // 파랑
+          backgroundColor = { red: 0.8, green: 0.93, blue: 1 }; // 파란색
         } else if (timeDiffMin <= 15) {
-            finalStatus = '출석';
-            backgroundColor = { red: 0.8, green: 1, blue: 0.8 }; // 초록
+          finalStatus = '출석';
+          backgroundColor = { red: 0.8, green: 1, blue: 0.8 }; // 초록
         } else if (timeDiffMin > 15 && timeDiffMin <= 60) {
-            finalStatus = '지각';
-            backgroundColor = { red: 1, green: 1, blue: 0.6 }; // 노랑
+          finalStatus = '지각';
+          backgroundColor = { red: 1, green: 1, blue: 0.6 }; // 노랑
         } else {
-            finalStatus = '결석';
-            backgroundColor = { red: 1, green: 0.8, blue: 0.8 }; // 빨강
+          finalStatus = '결석';
+          backgroundColor = { red: 1, green: 0.8, blue: 0.8 }; // 빨강
         }
 
         // 🔍 기존 데이터 가져오기
