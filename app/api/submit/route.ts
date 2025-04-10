@@ -54,12 +54,13 @@ export async function POST(request: NextRequest) {
         // 시간 차이 계산
         const timeDiffMin = (currentDate.getTime() - startTime.getTime()) / (1000 * 60);
       
-        // 제출 시간 문자열
-        const submitTime = currentDate.toLocaleTimeString('ko-KR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Asia/Seoul'
-        });
+        // 🔧 한국 시간 기준으로 현재 시간 객체 생성
+        const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+
+        // 🔧 완전한 텍스트 형태로 제출 시간 생성
+        const submitTime = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ` +
+                   `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
       
         let finalStatus = status;
         let backgroundColor;
