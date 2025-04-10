@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
         return normalizeKorean(rawTitle) === normalizeKorean(song);
     });
     
-    if (!targetSheet?.properties?.sheetId === undefined) {
+    if (!targetSheet || targetSheet.properties?.sheetId === undefined) {
         throw new Error("해당 시트를 찾을 수 없습니다.");
     }
 
