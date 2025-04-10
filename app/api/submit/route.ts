@@ -8,10 +8,11 @@ export async function POST(request: NextRequest) {
   const songTrimmed = song.trim();
   console.log("📌 요청으로 받은 데이터:", body);
 
-  // ✅ 현재 시간 (KST 기준)
-  const currentDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  // ✅ 현재 시간 (UTC → KST 변환)
+  const now = new Date();
+  const currentDate = new Date(now.getTime() + 9 * 60 * 60 * 1000); // KST = UTC + 9시간
 
-  // ✅ 제출 시간 문자열 (날짜 + 시간 텍스트로 명시)
+  // ✅ 제출 시간 문자열
   const submitTime = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1)
     .toString()
     .padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')} ` +
@@ -36,9 +37,9 @@ export async function POST(request: NextRequest) {
   const range = `${songTrimmed}!A:F`;
 
   try {
-    // ✅ 합주 시작 시간 (KST 기준) - 문자열로 명확하게 처리
-    const startTimeParts = `${date} ${timeSlot}`; // 예: "2025-04-10 13:30"
-    const startTime = new Date(new Date(startTimeParts).toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    // ✅ 합주 시작 시간 (UTC + 9)
+    const [hourStr, minuteStr] = timeSlot.split(':');
+    const startTime = new Date(`${date}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00+09:00`);
 
     const timeDiffMin = (currentDate.getTime() - startTime.getTime()) / (1000 * 60);
 
