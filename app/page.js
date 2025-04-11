@@ -140,11 +140,12 @@ const AttendanceForm = () => {
             <option value="출석">출석</option>
             <option value="일반결석계">일반결석계</option>
             <option value="고정결석계">고정결석계</option>
+            <option value="고정지각">고정지각</option>
           </select>
         </div>
 
         <div>
-          <label className="block mb-1">사유 (선택)</label>
+          <label className="block mb-1">결석/지각 사유 및 지각 시간</label>
           <textarea name="reason" value={formData.reason} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full"></textarea>
         </div>
 

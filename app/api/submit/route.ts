@@ -50,10 +50,12 @@ export async function POST(request: NextRequest) {
 
     if (finalStatus === '고정결석계' || finalStatus === '일반결석계') {
       backgroundColor = { red: 0.8, green: 0.93, blue: 1 }; // 파란색
+    } else if (finalStatus === '고정지각') {
+      backgroundColor = {red : 0.9, green: 0.8, blue: 1}; // 보라색
     } else if (timeDiffMin <= 10) {
       finalStatus = '출석';
       backgroundColor = { red: 0.8, green: 1, blue: 0.8 }; // 초록
-    } else if (timeDiffMin > 10 && timeDiffMin <= 30) {
+    } else if (timeDiffMin > 10 && timeDiffMin <= 40) {
       finalStatus = '지각';
       backgroundColor = { red: 1, green: 1, blue: 0.6 }; // 노랑
     } else {
