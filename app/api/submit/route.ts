@@ -13,10 +13,10 @@ export async function POST(request: NextRequest) {
   const currentDate = new Date(now.getTime() + 9 * 60 * 60 * 1000); // KST 기준 현재 시간
 
   // ✅ 제출 시간 문자열
-  const submitTime = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1)
+  const submitDate = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1)
     .toString()
-    .padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')} ` +
-    `${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
+    .padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')}`;
+  const submitClock = `${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
 
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     return new Response(JSON.stringify({ error: '유효하지 않은 곡명입니다.' }), { status: 400 });
   }
 
-  const range = `${songTrimmed}!A:F`;
+  const range = `${songTrimmed}!A:H`;
 
   try {
     // ✅ 합주 시작 시간 (KST = UTC + 9시간)
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       range: `${songTrimmed}!A${nextRow}:F${nextRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[song, name, date, finalStatus, reason, submitTime]],
+        values: [[song, name, date, finalStatus, reason, submitDate, submitClock]],
       },
     });
 
