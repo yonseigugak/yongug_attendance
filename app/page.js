@@ -22,35 +22,47 @@ const AttendanceForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+  
     const timeSlot = formData.rehearsalTime.split('-')[0];
-
-    // ⛳ 출석인 경우에만 위치 제한 적용
+  
     if (formData.status === '출석') {
+      // 🔒 오늘 날짜 체크
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+  
+      if (formData.date !== todayStr) {
+        alert("출석은 오늘 날짜에만 가능합니다.");
+        return;
+      }
+  
+      // ⛳ 위치 제한 (출석만)
       const targetLat = 37.5635;
       const targetLng = 126.9383;
-
+  
       if (!navigator.geolocation) {
         alert("위치 정보가 지원되지 않는 브라우저입니다.");
         return;
       }
-
+  
       navigator.geolocation.getCurrentPosition(async (position) => {
         const { latitude, longitude } = position.coords;
         const distance = getDistance(latitude, longitude, targetLat, targetLng);
-
+  
         if (distance > 100) {
           alert("출석은 학생회관 내에서만 가능합니다.");
           return;
         }
-
+  
         await submitAttendance(timeSlot);
       }, (error) => {
         alert("위치 정보를 가져오지 못했습니다.");
         console.error(error);
       });
     } else {
-      // 결석계는 위치 무관
+      // 결석계/고정지각은 날짜 무관
       await submitAttendance(timeSlot);
     }
   };
