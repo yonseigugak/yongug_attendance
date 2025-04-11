@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     let finalStatus = status;
     let backgroundColor;
 
-    if (reason === '고정결석계' || reason === '일반결석계') {
+    if (finalStatus === '고정결석계' || finalStatus === '일반결석계') {
       backgroundColor = { red: 0.8, green: 0.93, blue: 1 }; // 파란색
     } else if (timeDiffMin <= 15) {
       finalStatus = '출석';
