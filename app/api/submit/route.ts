@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const startTimeUTC = new Date(`${date}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00Z`);
     const startTime = new Date(startTimeUTC.getTime() + 9 * 60 * 60 * 1000);
 
-    const timeDiffMin = (currentDate.getTime() - startTime.getTime()) / (1000 * 60);
+    const timeDiffMin = (currentDate.getTime() - startTime.getTime()) / (1000 * 60) + 540;
 
     // ✅ 출결 상태 및 배경색 결정
     let finalStatus = status;
