@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     // ✅ 데이터 저장
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${songTrimmed}!A${nextRow}:F${nextRow}`,
+      range: `${songTrimmed}!A${nextRow}:G${nextRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[song, name, date, finalStatus, reason, submitDate, submitClock]],
