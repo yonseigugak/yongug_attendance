@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
                 startRowIndex: nextRow - 1,
                 endRowIndex: nextRow,
                 startColumnIndex: 0,
-                endColumnIndex: 6,
+                endColumnIndex: 7,
               },
               cell: {
                 userEnteredFormat: { backgroundColor },
