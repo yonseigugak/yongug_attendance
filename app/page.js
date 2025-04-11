@@ -23,9 +23,39 @@ const AttendanceForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 🎯 합주 시작 시간만 추출 (예: "19:00")
     const timeSlot = formData.rehearsalTime.split('-')[0];
 
+    // ⛳ 출석인 경우에만 위치 제한 적용
+    if (formData.status === '출석') {
+      const targetLat = 37.5635;
+      const targetLng = 126.9383;
+
+      if (!navigator.geolocation) {
+        alert("위치 정보가 지원되지 않는 브라우저입니다.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        const distance = getDistance(latitude, longitude, targetLat, targetLng);
+
+        if (distance > 100) {
+          alert("출석은 학생회관 내에서만 가능합니다.");
+          return;
+        }
+
+        await submitAttendance(timeSlot);
+      }, (error) => {
+        alert("위치 정보를 가져오지 못했습니다.");
+        console.error(error);
+      });
+    } else {
+      // 결석계는 위치 무관
+      await submitAttendance(timeSlot);
+    }
+  };
+
+  const submitAttendance = async (timeSlot) => {
     try {
       const response = await fetch('/api/submit', {
         method: 'POST',
@@ -34,7 +64,7 @@ const AttendanceForm = () => {
         },
         body: JSON.stringify({
           ...formData,
-          timeSlot, // ✅ timeSlot 추가
+          timeSlot,
         }),
       });
 
@@ -49,6 +79,21 @@ const AttendanceForm = () => {
       console.error('제출 중 오류 발생:', error);
       alert('제출 중 오류 발생');
     }
+  };
+
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // 지구 반지름 (미터)
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) ** 2 +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
   };
 
   return (
