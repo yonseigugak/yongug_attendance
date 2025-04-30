@@ -37,6 +37,16 @@ const AttendanceForm = () => {
         alert("출석은 오늘 날짜에만 가능합니다.");
         return;
       }
+
+      // ⏱ 합주 시작 30분 전부터만 허용
+      const rehearsalStartTime = new Date(`${formData.date}T${timeSlot}:00`);
+      const now = new Date();
+      const earliestAllowed = new Date(rehearsalStartTime.getTime() - 30 * 60 * 1000); // 30분 전
+
+      if (now < earliestAllowed) {
+        alert("출석은 합주 시작 30분 전부터만 가능합니다.");
+        return;
+      }
   
       // ⛳ 위치 제한 (출석만)
       const targetLat = 37.5635;
@@ -51,7 +61,7 @@ const AttendanceForm = () => {
         const { latitude, longitude } = position.coords;
         const distance = getDistance(latitude, longitude, targetLat, targetLng);
   
-        if (distance > 100) {
+        if (distance > 60) {
           alert("출석은 학생회관 내에서만 가능합니다.");
           return;
         }
@@ -151,8 +161,8 @@ const AttendanceForm = () => {
           <select name="status" value={formData.status} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full">
             <option value="출석">출석</option>
             <option value="일반결석계">일반결석계</option>
-            <option value="고정결석계">고정결석계</option>
-            <option value="고정지각">고정지각</option>
+            {/* <option value="고정결석계">고정결석계</option> */}
+            {/* <option value="고정지각">고정지각</option> */}
           </select>
         </div>
 
