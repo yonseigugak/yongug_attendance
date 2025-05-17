@@ -77,7 +77,7 @@ const rows = getResponse.data.values || [];
    ❶ 출석이면 같은 날짜·이름의 결석계 삭제
 ────────────────────────────────────────────── */
 let deletedCount = 0;
-if (finalStatus === '출석' || finalStatus === '지각' || finalStatus === '결석') {
+if (finalStatus === '출석' || finalStatus === '지각') {
   const absenceTypes = ['고정결석계', '일반결석계'];
   const deleteTargets: number[] = [];
 
