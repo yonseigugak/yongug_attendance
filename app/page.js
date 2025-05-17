@@ -79,6 +79,14 @@ const AttendanceForm = () => {
         );
       } else {
         // 결석계/고정지각 등 날짜 무관
+        const rehearsalStartTime = new Date(`${formData.date}T${timeSlot}:00`);
+        const now = new Date();
+        
+        if (now >= rehearsalStartTime) {
+          alert("결석계는 합주 시작 시각 이전까지만 제출 가능합니다.");
+          return;
+        }
+
         await submitAttendance(timeSlot);
       }
     } finally {
