@@ -127,10 +127,11 @@ if (finalStatus === '출석' || finalStatus === '지각') {
 const nextRow = rows.length - deletedCount + 1;  // 헤더 포함
 
     // ✅ 데이터 저장
-    await sheets.spreadsheets.values.update({
+    await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: `${songTrimmed}!A${nextRow}:G${nextRow}`,
+      range: `${songTrimmed}!A:G`,
       valueInputOption: 'USER_ENTERED',
+      insertDataOption : 'INSERT_ROWS',
       requestBody: {
         values: [[song, name, date, finalStatus, reason, submitDate, submitClock]],
       },
