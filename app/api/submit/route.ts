@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import type { NextRequest } from 'next/server';
 
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { song, name, date, status, reason, timeSlot } = body;
@@ -34,7 +35,6 @@ export async function POST(request: NextRequest) {
     return new Response(JSON.stringify({ error: '유효하지 않은 곡명입니다.' }), { status: 400 });
   }
 
-  const range = `${songTrimmed}!A:H`;
 
   try {
     // ✅ 합주 시작 시간 (KST = UTC + 9시간)
@@ -69,117 +69,94 @@ export async function POST(request: NextRequest) {
     console.log("⏱️ 시간 차이 (분):", timeDiffMin);
     console.log("📌 최종 출결 상태:", finalStatus);
 
-// ✅ 기존 데이터 불러오기
-const getResponse = await sheets.spreadsheets.values.get({ spreadsheetId, range });
-const rows = getResponse.data.values || [];
+/* 0) 시트 메타 – sheetId 한 번만 구해둡니다 */
+const meta = await sheets.spreadsheets.get({
+  spreadsheetId,
+  includeGridData: false,
+  fields: 'sheets.properties',
+});
+const sheetId =
+  meta.data.sheets?.find(s => s.properties?.title === songTrimmed)?.properties
+    ?.sheetId;
+if (sheetId === undefined) throw new Error('sheetId not found');
 
-/* ──────────────────────────────────────────────
-   ❶ 출석이면 같은 날짜·이름의 결석계 삭제
-────────────────────────────────────────────── */
-let deletedCount = 0;
-if (finalStatus === '출석' || finalStatus === '지각') {
-  const absenceTypes = ['고정결석계', '일반결석계'];
-  const deleteTargets: number[] = [];
+/* 1) 스냅숏 로딩 & “삭제 대상” 재확인 */
+const range = `${songTrimmed}!A:I`;      // 8-컬럼(곡·이름·날짜·timeSlot·상태…)
+const { data } = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+const rows = data.values ?? [];
 
-  rows.forEach((row, i) => {
-    if (i === 0) return;                     // 헤더 스킵
-    const [, rName, rDate, rStatus] = row;   // A열=곡명이므로 B~D 열 확인
-    if (
-      rName?.trim() === name.trim() &&
-      rDate === date &&
-      absenceTypes.includes(rStatus)
-    ) {
-      deleteTargets.push(i);                 // 0-based index
-    }
+const isAbsenceRow = (row: any[]) => {
+  const [, rName, rDate, rTime, rStatus] = row;
+  const timeMatch = !rTime || rTime === timeSlot;
+  return rName?.trim() === name.trim() &&
+         rDate === date &&
+         timeMatch &&
+         ['고정결석계','일반결석계'].includes(rStatus);
+};
+
+const deleteIdx = rows
+  .map((row, i) => (i !== 0 && isAbsenceRow(row)) ? i : -1)  // 0 = 헤더
+  .filter(i => i > 0)
+  .sort((a,b) => b - a);          // 큰 행부터 (행 밀림 방지)
+
+/* 2) append + delete + 색칠을 ‘한 번의 batchUpdate’로 원자 처리 */
+const requests: any[] = [];
+
+/* 2-a) appendCells */
+requests.push({
+  appendCells: {
+    sheetId,
+    rows: [{
+      values: [
+        {userEnteredValue:{stringValue:song}},
+        {userEnteredValue:{stringValue:name}},
+        {userEnteredValue:{stringValue:date}},
+        {userEnteredValue:{stringValue:timeSlot}},          // 🔑 새 컬럼
+        {userEnteredValue:{stringValue:finalStatus}},
+        {userEnteredValue:{stringValue:reason}},
+        {userEnteredValue:{stringValue:submitDate}},
+        {userEnteredValue:{stringValue:submitClock}},
+      ],
+    }],
+    fields: '*',
+  },
+});
+
+/* 2-b) deleteDimension(필요할 때만) */
+deleteIdx.forEach(idx => {
+  requests.push({
+    deleteDimension: {
+      range: { sheetId, dimension:'ROWS', startIndex:idx, endIndex:idx+1 },
+    },
   });
+});
 
-  if (deleteTargets.length) {
-    deletedCount = deleteTargets.length;
-    deleteTargets.sort((a, b) => b - a);     // 큰 행부터 지움
+/* 2-c) repeatCell – 방금 append된 맨 마지막 행에 색칠
+   ( batch 안에서는 append 가 먼저 실행되므로 startRowIndex = rows.length )
+*/
+requests.push({
+  repeatCell: {
+    range: {
+      sheetId,
+      startRowIndex: rows.length,    // 기존 rows 길이 = 새 행의 0-based 인덱스
+      endRowIndex:   rows.length+1,
+      startColumnIndex: 0,
+      endColumnIndex: 8,             // A:I
+    },
+    cell: { userEnteredFormat: { backgroundColor } },
+    fields: 'userEnteredFormat.backgroundColor',
+  },
+});
 
-    // 시트 ID는 뒤에서 색칠할 때도 필요하니 한 번만 구해 둡니다
-    const sheetMeta = await sheets.spreadsheets.get({
-      spreadsheetId,
-      includeGridData: false,
-      fields: 'sheets.properties',
-    });
-    const sheetId =
-      sheetMeta.data.sheets?.find(s => s.properties?.title === songTrimmed)
-        ?.properties?.sheetId;
-    if (sheetId === undefined) throw new Error('시트 ID를 찾을 수 없음');
+await sheets.spreadsheets.batchUpdate({
+  spreadsheetId,
+  requestBody: { requests },
+});
 
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: deleteTargets.map(idx => ({
-          deleteDimension: {
-            range: { sheetId, dimension: 'ROWS', startIndex: idx, endIndex: idx + 1 },
-          },
-        })),
-      },
-    });
-  }
-}
-
-/* ──────────────────────────────────────────────
-   ❷ 삭제 건수를 반영해 nextRow 계산
-────────────────────────────────────────────── */
-const nextRow = rows.length - deletedCount + 1;  // 헤더 포함
-
-    // ✅ 데이터 저장
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: `${songTrimmed}!A:G`,
-      valueInputOption: 'USER_ENTERED',
-      insertDataOption : 'INSERT_ROWS',
-      requestBody: {
-        values: [[song, name, date, finalStatus, reason, submitDate, submitClock]],
-      },
-    });
-
-    // ✅ 시트 ID 찾기
-    const normalizeKorean = (str: string) => str.normalize("NFC").trim();
-    const sheetInfo = await sheets.spreadsheets.get({
-      spreadsheetId,
-      includeGridData: false,
-      fields: 'sheets.properties',
-    });
-
-    const targetSheet = sheetInfo.data.sheets?.find(sheet =>
-      normalizeKorean(sheet.properties?.title || '') === normalizeKorean(song)
-    );
-
-    if (!targetSheet || targetSheet.properties?.sheetId === undefined) {
-      throw new Error("해당 시트를 찾을 수 없습니다.");
-    }
-
-    const sheetId = targetSheet.properties.sheetId;
-
-    // ✅ 셀 배경색 설정
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [
-          {
-            repeatCell: {
-              range: {
-                sheetId,
-                startRowIndex: nextRow - 1,
-                endRowIndex: nextRow,
-                startColumnIndex: 0,
-                endColumnIndex: 7,
-              },
-              cell: {
-                userEnteredFormat: { backgroundColor },
-              },
-              fields: 'userEnteredFormat.backgroundColor',
-            },
-          },
-        ],
-      },
-    });
-
-    return new Response(JSON.stringify({ message: '저장 및 스타일 설정 성공!' }), { status: 200 });
+return new Response(
+  JSON.stringify({ message:'저장·삭제·색칠 원자처리 완료!' }),
+  { status:200 },
+);
   } catch (error) {
     console.error('📌 Google Sheets API 에러:', error);
     return new Response(JSON.stringify({ error: '저장 실패!' }), { status: 500 });
