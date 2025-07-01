@@ -15,7 +15,7 @@ const AttendanceForm = () => {
   // ⏳ 로딩 상태
   const [loading, setLoading] = useState(false);
 
-  // const submittingRef = useRef(false);
+  const submittingRef = useRef(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,7 +24,9 @@ const AttendanceForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return; // 중복 클릭 방지
+    
+    if (submittingRef.currnet) return; // 중복 클릭 방지
+    submittingRef.currnet = true;
     setLoading(true);
 
     const timeSlot = formData.rehearsalTime.split("-")[0];
@@ -93,6 +95,7 @@ const AttendanceForm = () => {
       }
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
