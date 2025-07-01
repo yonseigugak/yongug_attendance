@@ -15,6 +15,8 @@ const AttendanceForm = () => {
   // ⏳ 로딩 상태
   const [loading, setLoading] = useState(false);
 
+  // const submittingRef = useRef(false);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -65,7 +67,7 @@ const AttendanceForm = () => {
             const { latitude, longitude } = position.coords;
             const distance = getDistance(latitude, longitude, targetLat, targetLng);
 
-            if (distance > 60) {
+            if (distance > 200) {
               alert("출석은 학생회관 내에서만 가능합니다.");
               return;
             }
