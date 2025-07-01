@@ -1,29 +1,63 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from "react";
+
+type GeoPos = GeolocationPosition["coords"]
 
 const AttendanceForm = () => {
-  /* ─────────────────── state ─────────────────── */
+  /* 옵션 상태 */
+  const [songs, setSongs] = useState<string[]>([]);
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+
+  /* 폼 상태 */
   const [formData, setFormData] = useState({
-    song: "취타",
+    song: "" as string,            // ← 기본값 비움
     name: "",
     date: "",
     status: "출석",
     reason: "",
-    rehearsalTime: "19:00-20:20",
+    rehearsalTime: "" as string,
   });
+
+  /* 옵션 fetch */
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/options");
+        const { songs, timeSlots } = (await res.json()) as {
+            songs: string[];
+            timeSlots: string[];
+        };
+        setSongs(songs);
+        setTimeSlots(timeSlots);
+        setFormData(p => ({
+          ...p,
+          song: songs[0] ?? "",
+          rehearsalTime: timeSlots[0] ?? "",
+        }));
+      } catch (err) {
+        console.error(err);
+        alert("관리자 설정을 불러오지 못했습니다.");
+      }
+    })();
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const submittingRef = useRef(false);           // 연타 방지용 플래그
 
   /* ─────────────────── helpers ─────────────────── */
-  const handleChange = (e) => {
+  const handleChange = (
+    e: ChangeEvent<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // Geolocation → Promise 래핑
   const getPosition = () =>
-    new Promise((resolve, reject) => {
+    new Promise<GeolocationPosition>((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error("위치 정보가 지원되지 않는 브라우저입니다."));
       } else {
@@ -32,7 +66,7 @@ const AttendanceForm = () => {
     });
 
   // Haversine 거리 계산
-  const getDistance = (lat1, lon1, lat2, lon2) => {
+  const getDistance = (lat1:number, lon1:number, lat2:number, lon2:number) => {
     const R = 6371e3;
     const φ1 = (lat1 * Math.PI) / 180;
     const φ2 = (lat2 * Math.PI) / 180;
@@ -46,22 +80,18 @@ const AttendanceForm = () => {
   };
 
   // 서버 제출
-  const submitAttendance = async (timeSlot) => {
+  const submitAttendance = async (timeSlot:string) => {
     const response = await fetch("/api/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...formData, timeSlot }),
     });
-    const result = await response.json();
-    if (response.ok) {
-      alert("성공적으로 제출되었습니다!");
-    } else {
-      alert(`오류 발생: ${result.message}`);
-    }
+    const { message } = (await response.json()) as {message: string};
+    response.ok ? alert("성공적으로 제출되었습니다!") : alert(`오류 발생: ${message}`);
   };
 
   /* ─────────────────── submit ─────────────────── */
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (submittingRef.current) return;   // 🔒 이미 제출 중
@@ -93,11 +123,11 @@ const AttendanceForm = () => {
         // 위치 제한
         const targetLat = 37.5635;
         const targetLng = 126.9383;
-        let coords;
+        let coords: GeoPos;
         try {
           coords = (await getPosition()).coords;
-        } catch (err) {
-          alert(err.message);
+        } catch (err: unknown) {
+          alert(err instanceof Error ? err.message : String(err));
           return;
         }
         const distance = getDistance(
@@ -132,12 +162,15 @@ const AttendanceForm = () => {
 
   return (
     <div className="container mx-auto p-8">
-      {/* 진행바: loading=true 이면 상단에 파랑 바가 흐름 */}
-      {loading && <div className="fixed inset-x-0 top-0 h-1 bg-blue-500 animate-pulse z-50" />}
+      {/* 진행바 */}
+      {loading && (
+        <div className="fixed inset-x-0 top-0 h-1 bg-blue-500 animate-pulse z-50" />
+      )}
 
       <h1 className="text-3xl font-bold mb-6">합주 출석 기록</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* ────────── 곡명 ────────── */}
         <div>
           <label className="block mb-1">곡명</label>
           <select
@@ -145,15 +178,22 @@ const AttendanceForm = () => {
             value={formData.song}
             onChange={handleChange}
             className="border border-gray-300 rounded p-2 w-full"
+            disabled={songs.length === 0}            // 옵션 로딩 전 비활성화
+            required
           >
-            <option value="취타">취타</option>
-            <option value="축제">축제</option>
-            <option value="미락흘">미락흘</option>
-            <option value="도드리">도드리</option>
-            <option value="플투스">플투스</option>
+            {songs.length === 0 ? (
+              <option>로딩 중...</option>
+            ) : (
+              songs.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))
+            )}
           </select>
         </div>
 
+        {/* ────────── 합주 시간대 ────────── */}
         <div>
           <label className="block mb-1">합주 시간대</label>
           <select
@@ -161,17 +201,22 @@ const AttendanceForm = () => {
             value={formData.rehearsalTime}
             onChange={handleChange}
             className="border border-gray-300 rounded p-2 w-full"
+            disabled={timeSlots.length === 0}
+            required
           >
-            <option value="19:00-20:20">19:00-20:20</option>
-            <option value="20:30-21:50">20:30-21:50</option>
-            <option value="10:00-11:00">10:00-11:00</option>
-            <option value="11:15-12:15">11:15-12:15</option>
-            <option value="13:30-14:30">13:30-14:30</option>
-            <option value="14:45-15:45">14:45-15:45</option>
-            <option value="16:00-17:00">16:00-17:00</option>
+            {timeSlots.length === 0 ? (
+              <option>로딩 중...</option>
+            ) : (
+              timeSlots.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))
+            )}
           </select>
         </div>
 
+        {/* ────────── 나머지 필드 그대로 ────────── */}
         <div>
           <label className="block mb-1">이름</label>
           <input
@@ -219,22 +264,42 @@ const AttendanceForm = () => {
           />
         </div>
 
+        {/* ────────── 제출 버튼 ────────── */}
         <button
           type="submit"
-          disabled={loading}
-          className={`${loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-500"} text-white rounded py-2 px-4 mt-4 flex items-center justify-center gap-2`}
+          disabled={loading || songs.length === 0 || timeSlots.length === 0}
+          className={`${
+            loading
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-500"
+          } text-white rounded py-2 px-4 mt-4 flex items-center justify-center gap-2`}
         >
           {loading && (
-            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" />
+            <svg
+              className="h-5 w-5 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                fill="currentColor"
+              />
             </svg>
           )}
           {loading ? "제출 중..." : "제출"}
         </button>
       </form>
     </div>
-  );
+    );
 };
 
 export default AttendanceForm;

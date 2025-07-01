@@ -29,10 +29,16 @@ export async function POST(request: NextRequest) {
 
   const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheetId = process.env.GOOGLE_SHEETS_SHEET_ID;
-  const validSheets = ['취타', '축제', '미락흘', '도드리', '플투스'];
+    // CONFIG 곡명 읽기
+  const config = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: 'CONFIG!A:A',
+  });
+  const configSongs =
+    (config.data.values ?? []).slice(1).map(r => r[0]).filter(Boolean);
 
-  if (!validSheets.includes(songTrimmed)) {
-    return new Response(JSON.stringify({ error: '유효하지 않은 곡명입니다.' }), { status: 400 });
+  if (!configSongs.includes(songTrimmed)) {
+    return Response.json({ error: 'CONFIG에 없는 곡명입니다.' }, { status: 400 });
   }
 
 
