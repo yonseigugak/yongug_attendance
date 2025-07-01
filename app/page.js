@@ -48,10 +48,10 @@ const AttendanceForm = () => {
         const now = new Date();
         const earliestAllowed = new Date(rehearsalStartTime.getTime() - 30 * 60 * 1000);
 
-        if (now < earliestAllowed) {
-          alert("출석은 합주 시작 30분 전부터만 가능합니다.");
-          return;
-        }
+        //if (now < earliestAllowed) {
+        //  alert("출석은 합주 시작 30분 전부터만 가능합니다.");
+        //  return;
+        //}
 
         // ⛳ 위치 제한 (출석만)
         const targetLat = 37.5635;
