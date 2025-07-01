@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 const AttendanceForm = () => {
+  /* ─────────────────── state ─────────────────── */
   const [formData, setFormData] = useState({
     song: "취타",
     name: "",
@@ -11,108 +12,47 @@ const AttendanceForm = () => {
     reason: "",
     rehearsalTime: "19:00-20:20",
   });
-
-  // ⏳ 로딩 상태
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);           // 연타 방지용 플래그
 
-  const submittingRef = useRef(false);
-
+  /* ─────────────────── helpers ─────────────────── */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (submittingRef.currnet) return; // 중복 클릭 방지
-    submittingRef.currnet = true;
-    setLoading(true);
-
-    const timeSlot = formData.rehearsalTime.split("-")[0];
-
-    try {
-      if (formData.status === "출석") {
-        // 🔒 오늘 날짜 체크
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, "0");
-        const dd = String(today.getDate()).padStart(2, "0");
-        const todayStr = `${yyyy}-${mm}-${dd}`;
-
-        if (formData.date !== todayStr) {
-          alert("출석은 오늘 날짜에만 가능합니다.");
-          return;
-        }
-
-        // ⏱ 합주 시작 30분 전부터만 허용
-        const rehearsalStartTime = new Date(`${formData.date}T${timeSlot}:00`);
-        const now = new Date();
-        const earliestAllowed = new Date(rehearsalStartTime.getTime() - 30 * 60 * 1000);
-
-        //if (now < earliestAllowed) {
-        //  alert("출석은 합주 시작 30분 전부터만 가능합니다.");
-        //  return;
-        //}
-
-        // ⛳ 위치 제한 (출석만)
-        const targetLat = 37.5635;
-        const targetLng = 126.9383;
-
-        if (!navigator.geolocation) {
-          alert("위치 정보가 지원되지 않는 브라우저입니다.");
-          return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            const distance = getDistance(latitude, longitude, targetLat, targetLng);
-
-            if (distance > 200) {
-              alert("출석은 학생회관 내에서만 가능합니다.");
-              return;
-            }
-
-            await submitAttendance(timeSlot);
-          },
-          (error) => {
-            alert("위치 정보를 가져오지 못했습니다.");
-            console.error(error);
-          }
-        );
+  // Geolocation → Promise 래핑
+  const getPosition = () =>
+    new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("위치 정보가 지원되지 않는 브라우저입니다."));
       } else {
-        // 결석계/고정지각 등 날짜 무관
-        const rehearsalStartTime = new Date(`${formData.date}T${timeSlot}:00`);
-        const now = new Date();
-        
-        if (now >= rehearsalStartTime) {
-          alert("결석계는 합주 시작 시각 이전까지만 제출 가능합니다.");
-          return;
-        }
-
-        await submitAttendance(timeSlot);
+        navigator.geolocation.getCurrentPosition(resolve, reject);
       }
-    } finally {
-      setLoading(false);
-      submittingRef.current = false;
-    }
+    });
+
+  // Haversine 거리 계산
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3;
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(Δφ / 2) ** 2 +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // meters
   };
 
+  // 서버 제출
   const submitAttendance = async (timeSlot) => {
     const response = await fetch("/api/submit", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...formData,
-        timeSlot,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...formData, timeSlot }),
     });
-
     const result = await response.json();
-
     if (response.ok) {
       alert("성공적으로 제출되었습니다!");
     } else {
@@ -120,19 +60,74 @@ const AttendanceForm = () => {
     }
   };
 
-  const getDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3; // 지구 반지름 (미터)
-    const φ1 = (lat1 * Math.PI) / 180;
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  /* ─────────────────── submit ─────────────────── */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    const a =
-      Math.sin(Δφ / 2) ** 2 +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    if (submittingRef.current) return;   // 🔒 이미 제출 중
+    submittingRef.current = true;
+    setLoading(true);
 
-    return R * c; // 미터 단위 거리 반환
+    const timeSlot = formData.rehearsalTime.split("-")[0];
+
+    try {
+      /* ───── 출석 ───── */
+      if (formData.status === "출석") {
+        // 날짜 = 오늘?
+        const today = new Date();
+        const todayStr = today.toISOString().substring(0, 10);
+        if (formData.date !== todayStr) {
+          alert("출석은 오늘 날짜에만 가능합니다.");
+          return;
+        }
+
+        // 합주 30분 전까지만 허용 (필요하면 주석 해제)
+        /*
+        const rehearsalStart = new Date(`${formData.date}T${timeSlot}:00`);
+        if (Date.now() < rehearsalStart.getTime() - 30 * 60 * 1000) {
+          alert("출석은 합주 시작 30분 전부터만 가능합니다.");
+          return;
+        }
+        */
+
+        // 위치 제한
+        const targetLat = 37.5635;
+        const targetLng = 126.9383;
+        let coords;
+        try {
+          coords = (await getPosition()).coords;
+        } catch (err) {
+          alert(err.message);
+          return;
+        }
+        const distance = getDistance(
+          coords.latitude,
+          coords.longitude,
+          targetLat,
+          targetLng
+        );
+        if (distance > 200) {
+          alert("출석은 학생회관 내에서만 가능합니다.");
+          return;
+        }
+
+        // 🔗 서버로 제출
+        await submitAttendance(timeSlot);
+      }
+
+      /* ───── 결석계 ───── */
+      else {
+        const rehearsalStart = new Date(`${formData.date}T${timeSlot}:00`);
+        if (Date.now() >= rehearsalStart.getTime()) {
+          alert("결석계는 합주 시작 시각 이전까지만 제출 가능합니다.");
+          return;
+        }
+        await submitAttendance(timeSlot);
+      }
+    } finally {
+      setLoading(false);
+      submittingRef.current = false;   // 🔓 잠금 해제 (모든 비동기 종료 후)
+    }
   };
 
   return (
