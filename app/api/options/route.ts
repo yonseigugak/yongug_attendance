@@ -2,6 +2,8 @@
 import { google } from 'googleapis';
 import type { NextRequest } from 'next/server';
 
+export const runtime = 'nodejs';
+
 export async function GET(_req: NextRequest) {
   try {
     /* 인증 */
