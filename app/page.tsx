@@ -8,6 +8,7 @@ const AttendanceForm = () => {
   /* 옵션 상태 */
   const [songs, setSongs] = useState<string[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<string[]>([]);
 
   /* 폼 상태 */
   const [formData, setFormData] = useState({
@@ -24,16 +25,19 @@ const AttendanceForm = () => {
     (async () => {
       try {
         const res = await fetch("/api/options");
-        const { songs, timeSlots } = (await res.json()) as {
+        const { songs, timeSlots, statuses } = (await res.json()) as {
             songs: string[];
             timeSlots: string[];
+            statuses: string[];
         };
         setSongs(songs);
         setTimeSlots(timeSlots);
+        setStatuses(statuses);
         setFormData(p => ({
           ...p,
           song: songs[0] ?? "",
           rehearsalTime: timeSlots[0] ?? "",
+          status: statuses[0] ?? "",
         }));
       } catch (err) {
         console.error(err);
@@ -112,13 +116,13 @@ const AttendanceForm = () => {
         }
 
         // 합주 30분 전까지만 허용 (필요하면 주석 해제)
-        /*
+        
         const rehearsalStart = new Date(`${formData.date}T${timeSlot}:00`);
         if (Date.now() < rehearsalStart.getTime() - 30 * 60 * 1000) {
           alert("출석은 합주 시작 30분 전부터만 가능합니다.");
           return;
         }
-        */
+        
 
         // 위치 제한
         const targetLat = 37.5635;
@@ -136,7 +140,7 @@ const AttendanceForm = () => {
           targetLat,
           targetLng
         );
-        if (distance > 200) {
+        if (distance > 70) {
           alert("출석은 학생회관 내에서만 가능합니다.");
           return;
         }
@@ -248,9 +252,18 @@ const AttendanceForm = () => {
             value={formData.status}
             onChange={handleChange}
             className="border border-gray-300 rounded p-2 w-full"
+            disabled={statuses.length === 0}
+            required
           >
-            <option value="출석">출석</option>
-            <option value="일반결석계">일반결석계</option>
+            {statuses.length === 0 ? (
+              <option> 로딩 중 ...</option>
+            ) : (
+              statuses.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))
+            )}
           </select>
         </div>
 

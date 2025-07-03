@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest) {
     });
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.GOOGLE_SHEETS_SHEET_ID!;
-    const configRange = 'CONFIG!A:B'; // 관리자 탭 이름이 CONFIG라고 가정
+    const configRange = 'CONFIG!A:C'; // 관리자 탭 이름이 CONFIG라고 가정
 
     const { data } = await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -27,8 +27,9 @@ export async function GET(_req: NextRequest) {
     const rows = (data.values ?? []).slice(1);
     const songs = Array.from(new Set(rows.map(r => r[0]).filter(Boolean)));
     const timeSlots = Array.from(new Set(rows.map(r => r[1]).filter(Boolean)));
+    const statuses = Array.from(new Set(rows.map(r => r[2]).filter(Boolean)));
 
-    return Response.json({ songs, timeSlots });
+    return Response.json({ songs, timeSlots, statuses });
   } catch (e) {
     console.error(e);
     return Response.json({ error: 'CONFIG 탭 읽기 실패' }, { status: 500 });
