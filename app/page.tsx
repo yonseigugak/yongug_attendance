@@ -125,7 +125,7 @@ const AttendanceForm = () => {
         
 
         // 위치 제한
-        /*
+        
         const targetLat = 37.5635;
         const targetLng = 126.9383;
         let coords: GeoPos;
@@ -145,7 +145,7 @@ const AttendanceForm = () => {
           alert("출석은 학생회관 내에서만 가능합니다.");
           return;
         }
-          */
+        
 
         // 🔗 서버로 제출
         await submitAttendance(timeSlot);
