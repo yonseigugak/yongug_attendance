@@ -58,10 +58,10 @@ export async function POST(request: NextRequest) {
       backgroundColor = { red: 0.8, green: 0.93, blue: 1 }; // 파란색
     } else if (finalStatus === '고정지각') {
       backgroundColor = {red : 0.9, green: 0.8, blue: 1}; // 보라색
-    } else if (timeDiffMin <= 10) {
+    } else if (timeDiffMin <= 5) {
       finalStatus = '출석';
       backgroundColor = { red: 0.8, green: 1, blue: 0.8 }; // 초록
-    } else if (timeDiffMin > 10 && timeDiffMin <= 40) {
+    } else if (timeDiffMin > 5 && timeDiffMin <= 15) {
       finalStatus = '지각';
       backgroundColor = { red: 1, green: 1, blue: 0.6 }; // 노랑
     } else {
@@ -87,7 +87,7 @@ const sheetId =
 if (sheetId === undefined) throw new Error('sheetId not found');
 
 /* 1) 스냅숏 로딩 & “삭제 대상” 재확인 */
-const range = `${songTrimmed}!A:I`;      // 8-컬럼(곡·이름·날짜·timeSlot·상태…)
+const range = `${songTrimmed}!A:K`;      // 8-컬럼(곡·이름·날짜·timeSlot·상태…)
 const { data } = await sheets.spreadsheets.values.get({ spreadsheetId, range });
 const rows = data.values ?? [];
 
@@ -147,7 +147,7 @@ requests.push({
       startRowIndex: rows.length,    // 기존 rows 길이 = 새 행의 0-based 인덱스
       endRowIndex:   rows.length+1,
       startColumnIndex: 0,
-      endColumnIndex: 8,             // A:I
+      endColumnIndex: 10,             // A:I
     },
     cell: { userEnteredFormat: { backgroundColor } },
     fields: 'userEnteredFormat.backgroundColor',
