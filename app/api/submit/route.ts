@@ -86,15 +86,18 @@ const sheetId =
     ?.sheetId;
 if (sheetId === undefined) throw new Error('sheetId not found');
 
-// ✅ 일반결석계 4회 제한 (곡당)
 if (finalStatus === '일반결석계') {
   const absenceCount = rows.filter(row => {
-    const [, rName, , , rStatus] = row;
+    const rName = row[1]?.toString().trim();
+    const rStatus = row[4]?.toString().trim();
+
     return (
-      rName?.trim() === name.trim() &&
+      rName === name.trim() &&
       rStatus === '일반결석계'
     );
   }).length;
+
+  console.log("현재 일반결석계 개수:", absenceCount);
 
   if (absenceCount >= 4) {
     return new Response(
