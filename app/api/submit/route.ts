@@ -86,6 +86,24 @@ const sheetId =
     ?.sheetId;
 if (sheetId === undefined) throw new Error('sheetId not found');
 
+// ✅ 일반결석계 4회 제한 (곡당)
+if (finalStatus === '일반결석계') {
+  const absenceCount = rows.filter(row => {
+    const [, rName, , , rStatus] = row;
+    return (
+      rName?.trim() === name.trim() &&
+      rStatus === '일반결석계'
+    );
+  }).length;
+
+  if (absenceCount >= 4) {
+    return new Response(
+      JSON.stringify({ error: '일반결석계는 곡당 최대 4회까지 가능합니다.' }),
+      { status: 400 }
+    );
+  }
+}
+
 /* 1) 스냅숏 로딩 & “삭제 대상” 재확인 */
 const range = `${songTrimmed}!A:K`;      // 8-컬럼(곡·이름·날짜·timeSlot·상태…)
 const { data } = await sheets.spreadsheets.values.get({ spreadsheetId, range });
