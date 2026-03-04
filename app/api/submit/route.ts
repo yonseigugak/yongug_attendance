@@ -1,19 +1,15 @@
 import { google } from 'googleapis';
 import type { NextRequest } from 'next/server';
 
-
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { song, name, date, status, reason, timeSlot } = body;
 
   const songTrimmed = song.trim();
-  console.log("📌 요청으로 받은 데이터:", body);
 
-  // ✅ 현재 시간 (KST = UTC + 9시간)
   const now = new Date();
-  const currentDate = new Date(now.getTime() + 9 * 60 * 60 * 1000); // KST 기준 현재 시간
+  const currentDate = new Date(now.getTime() + 9 * 60 * 60 * 1000); // KST
 
-  // ✅ 제출 시간 문자열
   const submitDate = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1)
     .toString()
     .padStart(2, '0')}-${currentDate.getDate().toString().padStart(2, '0')}`;
@@ -29,28 +25,40 @@ export async function POST(request: NextRequest) {
 
   const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheetId = process.env.GOOGLE_SHEETS_SHEET_ID;
-    // CONFIG 곡명 읽기
-  const config = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: 'CONFIG!A:A',
-  });
-  const configSongs =
-    (config.data.values ?? []).slice(1).map(r => r[0]).filter(Boolean);
-
-  if (!configSongs.includes(songTrimmed)) {
-    return Response.json({ error: 'CONFIG에 없는 곡명입니다.' }, { status: 400 });
-  }
-
 
   try {
-    // ✅ 합주 시작 시간 (KST = UTC + 9시간)
+    /* ✅ sheetId */
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId,
+      includeGridData: false,
+      fields: 'sheets.properties',
+    });
+
+    const sheetId =
+      meta.data.sheets?.find(s => s.properties?.title === songTrimmed)
+        ?.properties?.sheetId;
+
+    if (sheetId === undefined) throw new Error('sheetId not found');
+
+    /* ✅ 기존 rows 먼저 불러오기 */
+    const range = `${songTrimmed}!A:K`;
+    const { data } = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
+    });
+
+    const rows = data.values ?? [];
+
+    /* ✅ 합주 시작 시간 계산 */
     const [hourStr, minuteStr] = timeSlot.split(':');
-    const startTimeUTC = new Date(`${date}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00Z`);
+    const startTimeUTC = new Date(
+      `${date}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00Z`
+    );
     const startTime = new Date(startTimeUTC.getTime() + 9 * 60 * 60 * 1000);
 
-    const timeDiffMin = (currentDate.getTime() - startTime.getTime()) / (1000 * 60) + 540;
+    const timeDiffMin =
+      (currentDate.getTime() - startTime.getTime()) / (1000 * 60);
 
-    // ✅ 출결 상태 및 배경색 결정
     let finalStatus = status;
     let backgroundColor;
 
@@ -65,26 +73,22 @@ export async function POST(request: NextRequest) {
       finalStatus = '지각';
       backgroundColor = { red: 1, green: 1, blue: 0.6 }; // 노랑
     } else {
-      finalStatus = '결석';
-      backgroundColor = { red: 1, green: 0.8, blue: 0.8 }; // 빨강
+      // ✅ 시간 기준 자동 판정
+      if (timeDiffMin <= 5) {
+        finalStatus = '출석';
+        backgroundColor = { red: 0.8, green: 1, blue: 0.8 };
+      } else if (timeDiffMin <= 15) {
+        finalStatus = '지각';
+        backgroundColor = { red: 1, green: 1, blue: 0.6 };
+      } else {
+        finalStatus = '결석';
+        backgroundColor = { red: 1, green: 0.8, blue: 0.8 };
+      }
     }
 
-    // ✅ 디버깅 로그
-    console.log("🕒 현재 시간:", currentDate.toString());
-    console.log("🎯 합주 시작 시간:", startTime.toString());
-    console.log("⏱️ 시간 차이 (분):", timeDiffMin);
-    console.log("📌 최종 출결 상태:", finalStatus);
+    /* =================================================== */
 
-/* 0) 시트 메타 – sheetId 한 번만 구해둡니다 */
-const meta = await sheets.spreadsheets.get({
-  spreadsheetId,
-  includeGridData: false,
-  fields: 'sheets.properties',
-});
-const sheetId =
-  meta.data.sheets?.find(s => s.properties?.title === songTrimmed)?.properties
-    ?.sheetId;
-if (sheetId === undefined) throw new Error('sheetId not found');
+    const requests: any[] = [];
 
 if (finalStatus === '일반결석계') {
   const absenceCount = rows.filter(row => {
@@ -112,19 +116,24 @@ const range = `${songTrimmed}!A:K`;      // 8-컬럼(곡·이름·날짜·timeSl
 const { data } = await sheets.spreadsheets.values.get({ spreadsheetId, range });
 const rows = data.values ?? [];
 
-const isAbsenceRow = (row: any[]) => {
-  const [, rName, rDate, rTime, rStatus] = row;
-  const timeMatch = !rTime || rTime === timeSlot;
-  return rName?.trim() === name.trim() &&
-         rDate === date &&
-         timeMatch &&
-         ['고정결석계','일반결석계'].includes(rStatus);
-};
+    requests.push({
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: rows.length,
+          endRowIndex: rows.length + 1,
+          startColumnIndex: 0,
+          endColumnIndex: 10,
+        },
+        cell: { userEnteredFormat: { backgroundColor } },
+        fields: 'userEnteredFormat.backgroundColor',
+      },
+    });
 
-const deleteIdx = rows
-  .map((row, i) => (i !== 0 && isAbsenceRow(row)) ? i : -1)  // 0 = 헤더
-  .filter(i => i > 0)
-  .sort((a,b) => b - a);          // 큰 행부터 (행 밀림 방지)
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests },
+    });
 
 /* 2) append + delete + 색칠을 ‘한 번의 batchUpdate’로 원자 처리 */
 const requests: any[] = [];
@@ -185,7 +194,9 @@ return new Response(
   { status:200 },
 );
   } catch (error) {
-    console.error('📌 Google Sheets API 에러:', error);
-    return new Response(JSON.stringify({ error: '저장 실패!' }), { status: 500 });
+    console.error(error);
+    return new Response(JSON.stringify({ error: '저장 실패!' }), {
+      status: 500,
+    });
   }
 }
