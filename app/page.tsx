@@ -2,13 +2,16 @@
 
 import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from "react";
 
-type GeoPos = GeolocationPosition["coords"]
+type GeoPos = GeolocationPosition["coords"];
 
 const AttendanceForm = () => {
   /* 옵션 상태 */
   const [songs, setSongs] = useState<string[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
+
+  /* 🔥 일반결석계 사용 횟수 상태 추가 */
+  const [generalAbsentUsed, setGeneralAbsentUsed] = useState<number>(0);
 
   /* 폼 상태 */
   const [formData, setFormData] = useState({
@@ -29,7 +32,7 @@ const AttendanceForm = () => {
         setSongs(songs);
         setTimeSlots(timeSlots);
         setStatuses(statuses);
-        setFormData(p => ({
+        setFormData((p) => ({
           ...p,
           song: songs[0] ?? "",
           rehearsalTime: timeSlots[0] ?? "",
@@ -61,7 +64,7 @@ const AttendanceForm = () => {
       }
     });
 
-  const getDistance = (lat1:number, lon1:number, lat2:number, lon2:number) => {
+  const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
     const φ1 = (lat1 * Math.PI) / 180;
     const φ2 = (lat2 * Math.PI) / 180;
@@ -74,7 +77,7 @@ const AttendanceForm = () => {
     return R * c;
   };
 
-  /* 🔥 여기만 수정됨 */
+  /* 서버 제출 */
   const submitAttendance = async (timeSlot: string) => {
     const response = await fetch("/api/submit", {
       method: "POST",
@@ -86,7 +89,18 @@ const AttendanceForm = () => {
 
     if (!response.ok) {
       alert(result.error || "오류가 발생했습니다.");
+
+      /* 🔥 실패 시에도 현재 사용 횟수 반영 */
+      if (typeof result.generalAbsentUsed === "number") {
+        setGeneralAbsentUsed(result.generalAbsentUsed);
+      }
+
       return;
+    }
+
+    /* 🔥 성공 시 사용 횟수 업데이트 */
+    if (typeof result.generalAbsentUsed === "number") {
+      setGeneralAbsentUsed(result.generalAbsentUsed);
     }
 
     alert("성공적으로 제출되었습니다!");
@@ -140,9 +154,7 @@ const AttendanceForm = () => {
         }
 
         await submitAttendance(timeSlot);
-      }
-
-      else {
+      } else {
         const rehearsalStart = new Date(`${formData.date}T${timeSlot}:00`);
         if (Date.now() >= rehearsalStart.getTime()) {
           alert("결석계는 합주 시작 시각 이전까지만 제출 가능합니다.");
@@ -167,7 +179,19 @@ const AttendanceForm = () => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {/* 나머지 UI 부분 전부 동일 (생략 없이 유지) */}
+        {/* 기존 입력 UI 그대로 유지 */}
+
+        {/* 🔥 일반결석계 선택 시 사용 횟수 표시 */}
+        {formData.status === "일반결석계" && (
+          <div className="text-sm text-red-600">
+            현재 사용 횟수: {generalAbsentUsed} / 4회
+            {generalAbsentUsed >= 4 && (
+              <span className="ml-2 font-bold">
+                (최대 사용 횟수를 초과했습니다)
+              </span>
+            )}
+          </div>
+        )}
 
         <button
           type="submit"
