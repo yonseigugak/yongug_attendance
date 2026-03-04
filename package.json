@@ -15,9 +15,9 @@
     "clsx": "^2.1.1",
     "googleapis": "^148.0.0",
     "lucide-react": "^0.483.0",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
+    "next": "^15.2.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "shadcn": "^2.4.0-canary.17",
     "tailwind-merge": "^3.0.2",
     "tw-animate-css": "^1.2.4"
