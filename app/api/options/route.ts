@@ -14,22 +14,39 @@ export async function GET(_req: NextRequest) {
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
+
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.GOOGLE_SHEETS_SHEET_ID!;
-    const configRange = 'CONFIG!A:C'; // 관리자 탭 이름이 CONFIG라고 가정
+    const configRange = 'CONFIG!A:C';
 
     const { data } = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: configRange,
     });
 
-    // ▸ 첫 행(헤더) 제외, 빈 셀 제거
+    // 첫 행(헤더) 제외
     const rows = (data.values ?? []).slice(1);
-    const songs = Array.from(new Set(rows.map(r => r[0]).filter(Boolean)));
-    const timeSlots = Array.from(new Set(rows.map(r => r[1]).filter(Boolean)));
-    const statuses = Array.from(new Set(rows.map(r => r[2]).filter(Boolean)));
+
+    const songsSet = new Set<string>();
+    const timeSlotsSet = new Set<string>();
+    const statusesSet = new Set<string>();
+
+    for (const row of rows) {
+      const song = row?.[0]?.toString().trim();
+      const time = row?.[1]?.toString().trim();
+      const status = row?.[2]?.toString().trim();
+
+      if (song) songsSet.add(song);
+      if (time) timeSlotsSet.add(time);
+      if (status) statusesSet.add(status);
+    }
+
+    const songs = Array.from(songsSet);
+    const timeSlots = Array.from(timeSlotsSet);
+    const statuses = Array.from(statusesSet);
 
     return Response.json({ songs, timeSlots, statuses });
+
   } catch (e) {
     console.error(e);
     return Response.json({ error: 'CONFIG 탭 읽기 실패' }, { status: 500 });
