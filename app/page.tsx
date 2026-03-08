@@ -5,10 +5,10 @@ import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from "r
 type GeoPos = GeolocationPosition["coords"];
 
 const AttendanceForm = () => {
-
   const [songs, setSongs] = useState<string[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
+
   const [generalAbsentUsed, setGeneralAbsentUsed] = useState<number>(0);
 
   const [formData, setFormData] = useState({
@@ -20,24 +20,21 @@ const AttendanceForm = () => {
     rehearsalTime: "",
   });
 
-  const [loading, setLoading] = useState(false);
-  const submittingRef = useRef(false);
-
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch("/api/options");
         const { songs, timeSlots, statuses } = await res.json();
 
-        setSongs(songs ?? []);
-        setTimeSlots(timeSlots ?? []);
-        setStatuses(statuses ?? []);
+        setSongs(songs);
+        setTimeSlots(timeSlots);
+        setStatuses(statuses);
 
         setFormData((p) => ({
           ...p,
-          song: songs?.[0] ?? "",
-          rehearsalTime: timeSlots?.[0] ?? "",
-          status: statuses?.[0] ?? "출석",
+          song: songs[0] ?? "",
+          rehearsalTime: timeSlots[0] ?? "",
+          status: statuses[0] ?? "",
         }));
       } catch (err) {
         console.error(err);
@@ -46,6 +43,9 @@ const AttendanceForm = () => {
     })();
   }, []);
 
+  const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
+
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -53,13 +53,32 @@ const AttendanceForm = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const getPosition = () =>
+    new Promise<GeolocationPosition>((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("위치 정보가 지원되지 않는 브라우저입니다."));
+      } else {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      }
+    });
+
+  const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3;
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) ** 2 +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  };
+
   const submitAttendance = async (timeSlot: string) => {
-
-    if (formData.status === "일반결석계" && generalAbsentUsed >= 4) {
-      alert("일반결석계는 곡당 최대 4회까지 사용 가능합니다.");
-      return;
-    }
-
     const response = await fetch("/api/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -89,13 +108,69 @@ const AttendanceForm = () => {
     e.preventDefault();
 
     if (submittingRef.current) return;
+
     submittingRef.current = true;
     setLoading(true);
 
     const timeSlot = formData.rehearsalTime.split("-")[0];
 
     try {
-      await submitAttendance(timeSlot);
+      if (formData.status === "일반결석계" && generalAbsentUsed >= 4) {
+        alert("일반결석계는 곡당 최대 4회까지 사용할 수 있습니다.");
+        return;
+      }
+
+      if (formData.status === "출석") {
+        const today = new Date();
+        const todayStr = today.toISOString().substring(0, 10);
+
+        if (formData.date !== todayStr) {
+          alert("출석은 오늘 날짜에만 가능합니다.");
+          return;
+        }
+
+        const rehearsalStart = new Date(`${formData.date}T${timeSlot}:00`);
+
+        if (Date.now() < rehearsalStart.getTime() - 30 * 60 * 1000) {
+          alert("출석은 합주 시작 30분 전부터만 가능합니다.");
+          return;
+        }
+
+        const targetLat = 37.5635;
+        const targetLng = 126.9383;
+
+        let coords: GeoPos;
+
+        try {
+          coords = (await getPosition()).coords;
+        } catch (err: unknown) {
+          alert(err instanceof Error ? err.message : String(err));
+          return;
+        }
+
+        const distance = getDistance(
+          coords.latitude,
+          coords.longitude,
+          targetLat,
+          targetLng
+        );
+
+        if (distance > 70) {
+          alert("출석은 학생회관 내에서만 가능합니다.");
+          return;
+        }
+
+        await submitAttendance(timeSlot);
+      } else {
+        const rehearsalStart = new Date(`${formData.date}T${timeSlot}:00`);
+
+        if (Date.now() >= rehearsalStart.getTime()) {
+          alert("결석계는 합주 시작 시각 이전까지만 제출 가능합니다.");
+          return;
+        }
+
+        await submitAttendance(timeSlot);
+      }
     } finally {
       setLoading(false);
       submittingRef.current = false;
@@ -104,60 +179,50 @@ const AttendanceForm = () => {
 
   return (
     <div className="container mx-auto p-8">
+      {loading && (
+        <div className="fixed inset-x-0 top-0 h-1 bg-blue-500 animate-pulse z-50" />
+      )}
 
       <h1 className="text-3xl font-bold mb-6">합주 출석 기록</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {/* 곡 선택 */}
         <div>
-          <label className="block mb-1 font-medium">곡</label>
-          <select
-            name="song"
-            value={formData.song}
-            onChange={handleChange}
-            className="border rounded p-2 w-full"
-          >
+          <label>곡</label>
+          <select name="song" value={formData.song} onChange={handleChange}>
             {songs.map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
         </div>
 
-        {/* 이름 */}
         <div>
-          <label className="block mb-1 font-medium">이름</label>
+          <label>이름</label>
           <input
-            type="text"
             name="name"
             value={formData.name}
             onChange={handleChange}
             required
-            className="border rounded p-2 w-full"
           />
         </div>
 
-        {/* 날짜 */}
         <div>
-          <label className="block mb-1 font-medium">날짜</label>
+          <label>날짜</label>
           <input
             type="date"
             name="date"
             value={formData.date}
             onChange={handleChange}
             required
-            className="border rounded p-2 w-full"
           />
         </div>
 
-        {/* 합주 시간 */}
         <div>
-          <label className="block mb-1 font-medium">합주 시간</label>
+          <label>합주 시간</label>
           <select
             name="rehearsalTime"
             value={formData.rehearsalTime}
             onChange={handleChange}
-            className="border rounded p-2 w-full"
           >
             {timeSlots.map((t) => (
               <option key={t}>{t}</option>
@@ -165,14 +230,12 @@ const AttendanceForm = () => {
           </select>
         </div>
 
-        {/* 출결 상태 */}
         <div>
-          <label className="block mb-1 font-medium">출결 상태</label>
+          <label>출결 상태</label>
           <select
             name="status"
             value={formData.status}
             onChange={handleChange}
-            className="border rounded p-2 w-full"
           >
             {statuses.map((s) => (
               <option key={s}>{s}</option>
@@ -180,20 +243,17 @@ const AttendanceForm = () => {
           </select>
         </div>
 
-        {/* 사유 */}
         {formData.status !== "출석" && (
           <div>
-            <label className="block mb-1 font-medium">사유</label>
+            <label>사유</label>
             <textarea
               name="reason"
               value={formData.reason}
               onChange={handleChange}
-              className="border rounded p-2 w-full"
             />
           </div>
         )}
 
-        {/* 일반결석계 사용 횟수 표시 */}
         {formData.status === "일반결석계" && (
           <div className="text-sm text-red-600">
             현재 사용 횟수: {generalAbsentUsed} / 4회
@@ -208,7 +268,9 @@ const AttendanceForm = () => {
         <button
           type="submit"
           disabled={loading}
-          className={`${loading ? "bg-gray-400" : "bg-blue-500"} text-white rounded py-2 px-4`}
+          className={`${
+            loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-500"
+          } text-white rounded py-2 px-4 mt-4`}
         >
           {loading ? "제출 중..." : "제출"}
         </button>
