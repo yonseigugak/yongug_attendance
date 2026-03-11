@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     for (const s of meta.data.sheets ?? []) {
       const title = s.properties?.title;
       const id = s.properties?.sheetId;
-      if (title !== undefined && id !== undefined) {
+      if (title != null && id != null) {
         sheetMap.set(title, id);
       }
     }
