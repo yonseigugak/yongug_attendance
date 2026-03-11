@@ -1,6 +1,3 @@
-아래 코드 전체 복붙하세요!
-
-```typescript
 import { google } from 'googleapis';
 import type { NextRequest } from 'next/server';
 
@@ -197,4 +194,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-```
